@@ -49,22 +49,20 @@
 /**
  * Tutorial template.
  */
-{template .tutorial}
+{template .status}
   {@param prefix: string}
+  {@param step: number}
+  {@param numSteps: number}
 
-  <div id="{$prefix}content">
-    <h3>Tutorial</h3>
-
-    <ol class="progress">
-      <li data-step="1" class="is-active">
-        Step 1
-      </li>
-      <li data-step="2">
-        Step 2
-      </li>
-      <li data-step="3">
-        Step 3
-      </li>
-    </ol>
+  <div id="{$prefix}status">
+		<div id="{$prefix}buttons">
+			<a href="#" id="{$prefix}prev">Prev</a>
+			Step <span id="{$prefix}current-step">{$step}</span> of <span id="{$prefix}total-steps">{$numSteps}</span>
+			<a href="#" id="{$prefix}next">Next</a>
+		</div>
+		<svg id="{$prefix}instructions-icon" height="30" width="30">
+	  	<circle cx="15" cy="15" r="13" stroke="black" stroke-width="1" fill="green" fill-opacity="0.2"/>
+		  Instructions
+		</svg>
   </div>
 {/template}

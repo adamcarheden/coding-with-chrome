@@ -1,5 +1,19 @@
 {
   "author": "Markus Bordihn",
+	"addon": {
+		"tutorial": {
+			"steps": [
+				{
+					"file": "blockly",
+					"instructions": "Coding with Chrome lets you program using a graphical programming language called \"blockly\"."
+				},
+				{
+					"file": "__javascript__",
+					"instructions": "Programmers interact with most programming languages by writing plain old text. Blockly can be translated into a text-based programming language called \"JavaScript\". The code example from the previous step translates into the the JavaScript code you see here."
+				}
+			]
+		}
+	},
   "content": {
     "blockly": {
       "name": "blockly",

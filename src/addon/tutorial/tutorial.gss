@@ -14,6 +14,15 @@
  * limitations under the License.
  */
 
+#{$prefix}addon-tutorial-status {
+	text-align: center;
+}
+#{$prefix}addon-tutorial-prev {
+	margin-right: 0.5em;
+}
+#{$prefix}addon-tutorial-next {
+	margin-left: 0.5em;
+}
 
 #{$prefix}addon-tutorial-content h3 {
   margin: 10px;
