@@ -32,7 +32,9 @@ goog.require('cwc.ui.Preview');
  *   cwc.mode.makeblock.mbot.Connection|
  *   cwc.mode.makeblock.mbotRanger.Connection|
  *   cwc.mode.sphero.Connection|
- *   cwc.mode.sphero.sprkPlus.Connection}
+ *   cwc.mode.sphero.bb8.Connection|
+ *   cwc.mode.sphero.sprkPlus.Connection|
+ *   cwc.mode.sphero.ollie.Connection}
  */
 cwc.mode.default.ConnectionTypes;
 
@@ -43,7 +45,10 @@ cwc.mode.default.ConnectionTypes;
  *   cwc.renderer.internal.Coffeescript|
  *   cwc.renderer.internal.HTML5|
  *   cwc.renderer.internal.Javascript|
- *   cwc.renderer.external.Python}
+ *   cwc.renderer.external.Python|
+ *   cwc.renderer.external.PencilCode|
+ *   cwc.renderer.external.makeblock.MBotRanger|
+ *   cwc.renderer.external.makeblock.MBot}
  */
 cwc.mode.default.RendererTypes;
 
@@ -59,7 +64,8 @@ cwc.mode.default.RunnerTypes;
 
 /**
  * @typedef {cwc.mode.ev3.Monitor|
- *   cwc.mode.sphero.Monitor}
+ *   cwc.mode.sphero.Monitor|
+ *   cwc.mode.makeblock.mbot.Monitor}
  */
 cwc.mode.default.MonitorTypes;
 
@@ -149,6 +155,17 @@ cwc.mode.default.Mod.prototype.decorate = function() {
   if (this.renderer) {
     this.renderer.init();
   }
+};
+
+
+/**
+ * Decorates standard Editor.
+ */
+cwc.mode.default.Mod.prototype.decorateRaw = function() {
+  let layoutInstance = this.helper.getInstance('layout', true);
+  layoutInstance.decorateBlank();
+  layoutInstance.renderContent(cwc.soy.mode.default.Layout.editor);
+  this.decorateEditor();
 };
 
 
@@ -272,12 +289,13 @@ cwc.mode.default.Mod.prototype.showEditor_ = function() {
  */
 cwc.mode.default.Mod.prototype.showBlockly_ = function() {
   let dialogInstance = this.helper.getInstance('dialog');
-  dialogInstance.showYesNo('Warning', 'Switching to Blockly mode will ' +
-    'overwrite any manual changes! Continue?').then((answer) => {
-      if (answer) {
-        this.switchToEditor_();
-      }
-    });
+  dialogInstance.showActionCancel('Warning', 'Switching to Blockly mode ' +
+    'will overwrite any manual changes! Continue?', 'Continue').then(
+      (answer)=> {
+        if (answer) {
+          this.switchToEditor_();
+        }
+      });
 };
 
 

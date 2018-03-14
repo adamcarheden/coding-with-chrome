@@ -1,14 +1,19 @@
 {
   "author": "Unknown",
   "content": {
+    "blockly": {
+      "name": "blockly",
+      "type": "application/blockly+xml",
+      "size": 48,
+      "content": "<xml xmlns=\"http://www.w3.org/1999/xhtml\"></xml>",
+      "version": 1
+    },
     "__javascript__": {
       "name": "__javascript__",
       "type": "application/javascript",
       "size": 0,
       "content": "",
-      "group": "",
-      "version": 1,
-      "filename": ""
+      "version": 1
     }
   },
   "description": "",
@@ -17,9 +22,8 @@
   "format": "Coding with Chrome File Format 2",
   "frameworks": {},
   "history": "",
-  "mode": "basic",
-  "title": "Untitled Basic file",
-  "type": "basic",
-  "ui": "default",
+  "mode": "sphero_ollie_blockly",
+  "title": "Untitled Sphero Ollie blockly file",
+  "ui": "blockly",
   "version": "1.0"
 }

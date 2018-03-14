@@ -23,6 +23,8 @@ goog.require('cwc.protocol.bluetooth.lowEnergy.Adapter');
 goog.require('cwc.protocol.bluetooth.lowEnergy.Devices');
 goog.require('cwc.utils.Logger');
 
+goog.require('goog.events.EventTarget');
+
 
 /**
  * @param {!cwc.utils.Helper} helper
@@ -48,6 +50,9 @@ cwc.protocol.bluetooth.lowEnergy.Api = function(helper) {
 
   /** @private {cwc.protocol.bluetooth.lowEnergy.Adapter} */
   this.adapter_ = null;
+
+  /** @private {!goog.events.EventTarget} */
+  this.eventHandler_ = new goog.events.EventTarget();
 
   /** @private {!cwc.utils.Logger} */
   this.log_ = new cwc.utils.Logger(this.name);
@@ -78,22 +83,23 @@ cwc.protocol.bluetooth.lowEnergy.Api.prototype.prepare = function() {
 
 /**
  * @param {!cwc.protocol.bluetooth.lowEnergy.supportedDevices} device
+ * @return {Promise}
  */
 cwc.protocol.bluetooth.lowEnergy.Api.prototype.requestDevice = function(
     device) {
   if (this.devices) {
-    this.devices.requestDevice(device);
+    return this.devices.requestDevice(device);
   }
 };
 
 
 /**
- * @param {Function=} optCallback Will be only called  after an connection.
+ * @param {Function=} callback Will be only called  after an connection.
  */
 cwc.protocol.bluetooth.lowEnergy.Api.prototype.requestDevices = function(
-    optCallback) {
+    callback) {
   if (this.devices) {
-    this.devices.requestDevices(optCallback);
+    this.devices.requestDevices(callback);
   }
 };
 

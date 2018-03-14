@@ -65,10 +65,13 @@ describe('File format', function() {
     'ui': 'default',
     'version': '1.0',
   };
-  let addonContent = {};
-  let addonKey = Math.random().toString(36).replace();
-  let addonValue = Math.random().toString(36).replace();
-  addonContent[addonKey] = addonValue;
+  let metadataKey1 = Math.random().toString(36).replace();
+  let metadataValue1 = Math.random().toString(36).replace();
+  let metadataNamespace = Math.random().toString(36).replace();
+  let metadataKey2 = Math.random().toString(36).replace();
+  let metadataInnerKey = Math.random().toString(36).replace();
+  let metadataValue2 = {};
+  metadataValue2[metadataInnerKey] = Math.random().toString(36).replace();
 
   it('constructor', function() {
     expect(typeof fileFormat).toEqual('object');
@@ -112,15 +115,6 @@ describe('File format', function() {
     expect(fileFormat.getDescription()).toEqual('This is a test!');
   });
 
-  it('setFilename', function() {
-    fileFormat.setFilename('World Hello!');
-    fileFormat.setFilename('Hello World!');
-  });
-
-  it('getFilename', function() {
-    expect(fileFormat.getFilename()).toEqual('Hello World!');
-  });
-
   it('setTitle', function() {
     fileFormat.setTitle('This is a title!');
   });
@@ -141,16 +135,43 @@ describe('File format', function() {
     expect(fileFormat.hasFiles()).toEqual(false);
   });
 
-  it('getAddon (empty)', function() {
-    expect(fileFormat.getAddon()).toEqual({});
+  it('getMetadata (unset, default namespace)', function() {
+    expect(fileFormat.getMetadata(metadataKey1)).toEqual('');
   });
 
-  it('setAddon', function() {
-    fileFormat.setAddon(addonContent);
+  it('getMetadata (unset, non-default namespace)', function() {
+    expect(fileFormat.getMetadata(metadataKey1,
+      metadataNamespace)).toEqual('');
   });
 
-  it('getAddon', function() {
-    expect(fileFormat.getAddon()).toEqual(addonContent);
+  it('setMetadata (default namespace)', function() {
+    expect(() => {
+      fileFormat.setMetadata(metadataKey1, metadataValue1);
+    }).not.toThrow();
+  });
+
+  it('getMetadata (default namespace, set)', function() {
+    expect(fileFormat.getMetadata(metadataKey1)).toEqual(metadataValue1);
+  });
+
+  it('setMetadata (non-default namespace)', function() {
+    expect(() => {
+      fileFormat.setMetadata(metadataKey2, metadataValue2, metadataNamespace);
+    }).not.toThrow();
+  });
+
+  it('getMetadata (non-default namespace, wrong key)', function() {
+    expect(fileFormat.getMetadata(metadataKey1,
+      metadataNamespace)).toEqual('');
+  });
+
+  it('getMetadata (non-default namespace, correct key)', function() {
+    expect(fileFormat.getMetadata(metadataKey2,
+      metadataNamespace)).toEqual(metadataValue2);
+  });
+
+  it('getMetadata (default namespace, wrong key)', function() {
+    expect(fileFormat.getMetadata(metadataKey2)).toEqual('');
   });
 
   describe('Legacy format', function() {

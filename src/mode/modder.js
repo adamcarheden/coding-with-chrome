@@ -57,7 +57,7 @@ cwc.mode.Modder = function(helper) {
   /** @private {!goog.events.EventTarget} */
   this.eventHandler_ = new goog.events.EventTarget();
 
-  /** @type {string} */
+  /** @private {string} */
   this.templatePath_ = '../resources/templates/';
 };
 
@@ -79,11 +79,9 @@ cwc.mode.Modder.prototype.setMode = function(mode) {
   let modeConfig = cwc.mode.Config.get(mode);
 
   this.log_.info('Loading Mode', mode,
-    (modeConfig.version ? 'version ' + modeConfig.version : ''),
     (modeConfig.name ? '(' + modeConfig.name + ')' : ''),
     (modeConfig.authors ? 'from ' + modeConfig.authors : ''),
-    (modeConfig.description ? ':' + modeConfig.description : ''),
-    'MIME-types', modeConfig.mimeTypes
+    'for MIME-types', modeConfig.mimeTypes
   );
 
   // Remove former instances.
@@ -119,7 +117,7 @@ cwc.mode.Modder.prototype.setMode = function(mode) {
 
   this.log_.info('Initialize mode and decorate UI for', mode, '…');
   this.mode = mode;
-  this.modder = new modeConfig.Mod(this.helper);
+  this.modder = modeConfig.getMod(this.helper);
   this.modder.decorate();
 };
 
@@ -136,6 +134,7 @@ cwc.mode.Modder.prototype.setFilename = function(filename) {
  * @param {cwc.mode.Type} mode
  */
 cwc.mode.Modder.prototype.postMode = function(mode) {
+  this.log_.info('Post handling for', mode);
   let modeConfig = cwc.mode.Config.get(mode);
 
   // Preview Handling
@@ -146,7 +145,7 @@ cwc.mode.Modder.prototype.postMode = function(mode) {
   }
 
   // File handling
-  let fileHandlerInstance = this.helper.getInstance('fileHandler');
+  let fileHandlerInstance = this.helper.getInstance('file');
   if (fileHandlerInstance) {
     if (fileHandlerInstance.hasLibraryFiles()) {
       this.syncLibrary();
@@ -223,9 +222,8 @@ cwc.mode.Modder.prototype.showBlockly = function() {
  * Syncs the library with the existing files.
  */
 cwc.mode.Modder.prototype.syncLibrary = function() {
-  let fileInstance = this.helper.getInstance('file');
   let libraryInstance = this.helper.getInstance('library');
-  if (fileInstance && libraryInstance) {
+  if (libraryInstance) {
     libraryInstance.syncFiles();
   }
 };

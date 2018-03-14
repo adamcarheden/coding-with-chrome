@@ -46,8 +46,15 @@ cwc.mode.sphero.bb8.Connection = function(helper) {
   /** @private {!cwc.protocol.sphero.v1.Api} */
   this.api_ = new cwc.protocol.sphero.v1.Api();
 
+  /** @private {!goog.events.EventTarget} */
+  this.apiEvents_ = this.api_.getEventHandler();
+
   /** @private {!cwc.utils.Events} */
   this.events_ = new cwc.utils.Events(this.name);
+
+  /** @private {!cwc.protocol.bluetooth.lowEnergy.supportedDevices} */
+  this.device_ =
+    cwc.protocol.bluetooth.lowEnergy.supportedDevices.SPHERO_BB8;
 };
 
 
@@ -56,33 +63,45 @@ cwc.mode.sphero.bb8.Connection = function(helper) {
  * @export
  */
 cwc.mode.sphero.bb8.Connection.prototype.init = function() {
+  if (this.apiEvents_) {
+    this.events_.listen(this.apiEvents_,
+      cwc.protocol.sphero.v1.Events.Type.CONNECTING,
+      this.handleConnecting_.bind(this));
+  }
+
   if (!this.connectMonitor) {
     this.connectMonitor = new goog.Timer(this.connectMonitorInterval);
     this.events_.listen(this.connectMonitor, goog.Timer.TICK,
       this.connect.bind(this));
   }
-  this.connectMonitor.start();
-  this.connect();
+  let connectScreenInstance = this.helper.getInstance('connectScreen');
+  connectScreenInstance.requestBluetoothDevice(this.device_).then(
+    (bluetoothDevice) => {
+      bluetoothDevice.connect().then((device) => {
+        this.api_.connect(device);
+      });
+  }).catch(() => {
+    this.connectMonitor.start();
+  });
 };
 
 
 /**
- * Connects the Sphero ball.
+ * Connects the Sphero BB-8.
  * @param {Event=} opt_event
  * @export
  */
 cwc.mode.sphero.bb8.Connection.prototype.connect = function(opt_event) {
   if (!this.isConnected()) {
     let bluetoothInstance = this.helper.getInstance('bluetoothLE', true);
-    let devices = bluetoothInstance.getDevicesByName(
-      cwc.protocol.bluetooth.lowEnergy.supportedDevices.SPHERO_BB8.name);
+    let devices = bluetoothInstance.getDevicesByName(this.device_);
     if (devices) {
       devices[0].connect().then((device) => {
         this.api_.connect(device);
       });
     }
   }
-  this.api_.monitor(false);
+  this.api_.monitor(true);
 };
 
 
@@ -123,16 +142,29 @@ cwc.mode.sphero.bb8.Connection.prototype.isConnected = function() {
  * @return {goog.events.EventTarget}
  */
 cwc.mode.sphero.bb8.Connection.prototype.getEventHandler = function() {
-  return this.api_.getEventHandler();
+  return this.apiEvents_;
 };
 
 
 /**
- * @return {!cwc.protocol.sphero.classic.Api}
+ * @return {!cwc.protocol.sphero.v1.Api}
  * @export
  */
 cwc.mode.sphero.bb8.Connection.prototype.getApi = function() {
   return this.api_;
+};
+
+
+/**
+ * @param {Event} e
+ * @private
+ */
+cwc.mode.sphero.bb8.Connection.prototype.handleConnecting_ = function(e) {
+  let message = e.data;
+  let step = e.source;
+  let title = 'Connecting ' + this.device_.name;
+  let connectScreenInstance = this.helper.getInstance('connectScreen');
+  connectScreenInstance.showConnectingStep(title, message, step);
 };
 
 

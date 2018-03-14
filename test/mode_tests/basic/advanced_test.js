@@ -40,9 +40,9 @@ describe('[Mode Basic - Advanced]', function() {
   });
 
   describe('Loading file', function() {
-    it('block/blank.cwc', function(done) {
+    it('blank.cwc', function(done) {
       builder.loadFile(
-        '../resources/examples/simple/script/blank.cwc'
+        '../resources/templates/basic/blank.cwc'
       ).then(() => {
         expect(true).toEqual(true);
         done();
