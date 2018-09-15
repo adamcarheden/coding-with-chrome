@@ -30,30 +30,53 @@
   {@param prefix: string}
   {@param steps: list<?>}
   {@param url: string}
+  {@param allowEdit: bool}
 
-  <div id="{$prefix}container">
+  <div id="{$prefix}container" class="{$prefix}readonly">
+    {if $allowEdit}
+      <div class='{$prefix}edit-button'>
+        <i id="{$prefix}edit-enable" class="material-icons">lock</i>
+        <span class="{$prefix}edit">
+          <i id="{$prefix}edit-disable" class="material-icons">lock_open</i>
+          <i id="{$prefix}edit-steps" class="material-icons">reorder</i>
+        </span>
+      </div>
+    {/if}
     {if $url}
       <div id="{$prefix}url" class="mdl-typography--caption">
         Full Project: <a href="{$url}" target="_blank" noreferrer noopener>{$url}</a>
       </div>
     {/if}
-    <div id="{$prefix}description">
-      <p>{$description}</p>
-    </div>
+    {let $descriptionID: $prefix + 'description' /}
+    {call .formField_ data="all"}
+      {param fieldID: $descriptionID /}
+      {param fieldName: 'description' /}
+      {param fieldValue: $description /}
+      {param fieldInput kind="html"}
+        {call .textarea_ data="all"}
+          {param fieldID: $descriptionID /}
+          {param fieldValue: $description /}
+          {param rows: 10 /}
+        {/call}
+      {/param}
+    {/call}
+    
     <ol id="{$prefix}steps">
       {foreach $step in $steps}
         {call .step_ data="$step"}
           {param online: $online /}
-          {param prefix: $prefix + 'step-' /}
+          {param prefix: $prefix /}
+          {param stepPrefix: $prefix + 'step-' /}
           {param isLastStep: isLast($step) /}
+          {param allowEdit: $allowEdit /}
         {/call}
       {/foreach}
     </ol>
-    <div id="{$prefix}media-overlay" class='is-hidden'>
-      <button type="button" id="{$prefix}media-overlay-close" class="mdl-button mdl-js-button mdl-button--icon">
+    <div id="{$prefix}overlay" class='is-hidden'>
+      <button type="button" id="{$prefix}overlay-close" class="mdl-button mdl-js-button mdl-button--icon">
         <i class="material-icons">arrow_back</i>
       </button>
-      <div id="{$prefix}media-overlay-content"></div>
+      <div id="{$prefix}overlay-content"></div>
     </div>
   </div>
 {/template}
@@ -77,66 +100,271 @@
   {@param images: list<string>}
   {@param isLastStep: bool}
   {@param hasCode: bool}
-  {@param hasTour: bool}
   {@param number: number}
   {@param online: bool}
   {@param prefix: string}
+  {@param stepPrefix: string}
   {@param title: string}
   {@param videos: list<string>}
   {@param youtube_videos: list<string>}
+  {@param validate: string}
+  {@param selectedValidateType: string}
+  {@param validateTypes: map<string, string>}
+  {@param code: string}
+  {@param allowEdit: bool}
 
-  <li id="{$prefix}{$id}" class="{$prefix}container {$prefix}step">
-    <div class="{$prefix}header">
-      <div class="{$prefix}number">
-        <span class="{$prefix}number-text">{$number}</span>
-        <span class="{$prefix}number-check">
+  <li id="{$stepPrefix}{$id}" class="{$stepPrefix}container">
+    <div class="{$stepPrefix}header">
+      <div class="{$stepPrefix}number">
+        <span class="{$stepPrefix}number-text">{$number}</span>
+        <span class="{$stepPrefix}number-check">
           <i class="material-icons">checkmark</i>
         </span>
       </div>
-      <div class="{$prefix}title">{$title}</div>
+      {let $titleID: $stepPrefix + 'title-' + $id /}
+      {call .stepFormField_ data="all"}
+        {param fieldName: 'title' /}
+        {param fieldValue: $title /}
+        {param fieldID: $titleID /}
+        {param fieldInput kind="html"}
+          {call .input_ data="all"}
+            {param fieldValue: $title /}
+            {param fieldID: $titleID /}
+          {/call}
+        {/param}
+      {/call}
     </div>
-    <div class="{$prefix}content">
-      <div class="{$prefix}message"></div>
-      <div class="{$prefix}description">{$description}</div>
-      <div class="{$prefix}media">
+    <div class="{$stepPrefix}content">
+      <div class="{$stepPrefix}message"></div>
+      {let $descriptionID: $stepPrefix + 'description-' + $id /}
+      {call .stepFormField_ data="all"}
+        {param fieldName: 'description' /}
+        {param fieldValue: $description /}
+        {param fieldID: $descriptionID /}
+        {param fieldInput kind="html"}
+          {call .textarea_ data="all"}
+            {param fieldValue: $description /}
+            {param fieldID: $descriptionID /}
+            {param rows: 10 /}
+          {/call}
+        {/param}
+      {/call}
+      <div class="{$stepPrefix}media">
         {foreach $image in $images}
-          <button type="button" class="{$prefix}media-expand {$prefix}media-expand" title="Expand image" data-media-type="image">
-            <img data-src="{$image}" alt="" class="{$prefix}media-item {$prefix}image">
+          <button type="button" class="{$stepPrefix}media-expand" title="Expand image" data-media-type="image">
+            <img data-src="{$image}" alt="" class="{$stepPrefix}media-item {$prefix}image">
             <i class="material-icons">fullscreen</i>
           </button>
         {/foreach}
         {foreach $video in $videos}
-          <button type="button" class="{$prefix}media-expand {$prefix}media-expand {$prefix}media-expand" title="Expand video" data-media-type="video" data-video-url="{$video}">
-            <div class="{$prefix}media-item-video">
+          <button type="button" class="{$stepPrefix}media-expand {$stepPrefix}media-expand" title="Expand video" data-media-type="video" data-video-url="{$video}">
+            <div class="{$stepPrefix}media-item-video">
               <i class="material-icons">play_circle_outline</i>
             </div>
           </button>
         {/foreach}
         {if $online}
           {foreach $video in $youtube_videos}
-            <button type="button" class="{$prefix}media-expand {$prefix}media-expand {$prefix}media-expand" title="Expand video" data-media-type="youtube" data-youtube-id="{$video}">
-              <div class="{$prefix}media-item-video">
+            <button type="button" class="{$stepPrefix}media-expand {$stepPrefix}media-expand" title="Expand video" data-media-type="youtube" data-youtube-id="{$video}">
+              <div class="{$stepPrefix}media-item-video">
                 <i class="material-icons">play_circle_outline</i>
               </div>
             </button>
           {/foreach}
         {/if}
       </div>
-        <div class="{$prefix}actions">
+        <div class="{$stepPrefix}actions">
           {if $hasCode}
-            <button type="button" class="mdl-button mdl-js-button mdl-button--colored mdl-button--raised {$prefix}load-code">
-              <i class='material-icons'>chevron_left</i><label>{msg desc="Overwrite the content of the editor with the example code for the current step"}Load Example Code{/msg}</label>
-            </button>
-          {/if}
-          {if $hasTour}
-            <button type="button" class="mdl-button mdl-js-button mdl-button--colored mdl-button--raised {$prefix}load-tour">
-              <label>{msg desc="Shows the user what to do by opening a set of modal dialogs that point to areas of the scren"}Show Me{/msg}</label>
+            <button type="button" class="mdl-button mdl-js-button mdl-button--colored mdl-button--raised {$stepPrefix}load-code">
+              <i class='material-icons'>chevron_left</i><label>Load Example Code</label>
             </button>
           {/if}
           {if not $isLastStep}
-            <button type="button" class="mdl-button mdl-js-button mdl-button--colored mdl-button--raised {$prefix}continue">{msg desc="Continue to the next step"}Continue{/msg}</button>
+            <button type="button" class="mdl-button mdl-js-button mdl-button--colored mdl-button--raised {$stepPrefix}continue">Continue</button>
           {/if}
         </div>
+      <div class="{$prefix}edit-only">
+      {let $validateTypeID:  $prefix + 'validateType-' + $id /}
+      {call .stepFormField_ data="all"}
+        {param fieldName: 'validateType' /}
+        {param fieldValue: $validateTypes[$selectedValidateType] /}
+        {param fieldID: $validateTypeID /}
+        {param fieldLabel: 'Type of validation' /}
+        {param fieldInput kind="html"}
+          {call .select data="all"}
+            {param fieldValues: $validateTypes /}
+            {param selectedFieldValue: $selectedValidateType /}
+            {param fieldID: $validateTypeID /}
+          {/call}
+        {/param}
+      {/call}
+
+      {let $validateID:  $prefix + 'validate-' + $id /}
+      {call .stepFormField_ data="all"}
+        {param fieldName: 'validate' /}
+        {param fieldValue: $validate /}
+        {param fieldID: $validateID /}
+        {param fieldLabel: 'Validate' /}
+        {param fieldInput kind="html"}
+          {call .textarea_ data="all"}
+            {param fieldValue: $validate /}
+            {param fieldID: $validateID /}
+            {param rows: 10 /}
+          {/call}
+        {/param}
+      {/call}
+
+      {let $codeID:  $prefix + 'code-' + $id /}
+      {call .stepFormField_ data="all"}
+        {param fieldName: 'code' /}
+        {param fieldValue: $code /}
+        {param fieldID: $codeID /}
+        {param fieldLabel: 'Example Code' /}
+        {param fieldInput kind="html"}
+          {call .textarea_ data="all"}
+            {param fieldValue: $code /}
+            {param fieldID: $codeID /}
+            {param rows: 10 /}
+          {/call}
+        {/param}
+      {/call}
+      </div>
     </div>
   </li>
+{/template}
+
+/**
+ * A form field not associated with a specific step
+ */
+{template .formField_}
+  {@param fieldName: string}
+  {@param fieldValue: string}
+  {@param fieldID: string|int}
+  {@param fieldInput: string}
+  {@param? fieldLabel: string}
+  {@param prefix: string}
+  {@param allowEdit: bool}
+  <div {if isNonnull($fieldID)}id="{$fieldID}"{/if} class="{$prefix}{$fieldName} {$prefix}edit-field" data-field="{$fieldName}">
+    {call .formFieldEdit_ data="all" /}
+  </div>
+{/template}
+
+/**
+ * A form field associated with a specific step
+ */
+{template .stepFormField_}
+  {@param fieldName: string}
+  {@param fieldValue: string}
+  {@param fieldID: string|int}
+  {@param fieldInput: string}
+  {@param? fieldLabel: string}
+  {@param id: int}
+  {@param prefix: string}
+  {@param stepPrefix: string}
+  {@param allowEdit: bool}
+  <div class="{$stepPrefix}{$fieldName} {$prefix}edit-field" data-field="{$fieldName}" data-step="{$id}">
+    {call .formFieldEdit_ data="all" /}
+  </div>
+{/template}
+
+/**
+ * Edit controls for a form field
+ */
+{template .formFieldEdit_}
+  {@param fieldValue: string}
+  {@param fieldID: string|int}
+  {@param fieldInput: string}
+  {@param? fieldLabel: string}
+  {@param prefix: string}
+  {@param allowEdit: bool}
+  {if isNonnull($fieldLabel)}
+    <label class="{$prefix}label" for='{$fieldID}'>{$fieldLabel}</label>
+  {/if}
+  {if $allowEdit}
+    <div class="{$prefix}edit">
+      <i class="material-icons {$prefix}edit-control {$prefix}edit-activate {$prefix}edit-button">edit</i>
+      <div class="{$prefix}edit-form">
+        {$fieldInput}
+        <i class="material-icons {$prefix}edit-control {$prefix}edit-save">save</i>
+      </div>
+    </div>
+  {/if}
+  <span class="{$prefix}value">
+    {call .value}
+      {param value: $fieldValue /}
+    {/call}
+  </span>
+{/template}
+
+/**
+ * Input
+ */
+{template .input_}
+  {@param fieldID: string|int}
+  {@param fieldValue: string}
+  {@param prefix: string}
+  <input id="{$fieldID}" type='text' value='{$fieldValue}' class="{$prefix}edit-value"/>
+{/template}
+
+/**
+ * Text area
+ */
+{template .textarea_}
+  {@param fieldID: string|int}
+  {@param fieldValue: string}
+  {@param rows: int}
+  {@param prefix: string}
+  <textarea id="{$fieldID}" rows="{$rows}" class="{$prefix}edit-value">{$fieldValue}</textarea>
+{/template}
+
+/**
+ * Select
+ */
+{template .select}
+  {@param fieldID: string|int}
+  {@param fieldValues: map<string, string>}
+  {@param selectedFieldValue: string}
+  {@param prefix: string}
+  <select id='{$fieldID}' class="{$prefix}edit-value">
+    {foreach $value in keys($fieldValues)}
+      <option {if $value == $selectedFieldValue}selected="true"{/if} value="{$value}">{$fieldValues[$value]}</option>
+    {/foreach}
+  </select>
+{/template}
+
+/**
+ * Value
+ */
+{template .value}
+  {@param value: string}
+  {$value}
+{/template}
+
+/**
+ * Step editor
+ */
+{template .stepEditor_}
+  {@param prefix: string}
+  {@param steps: list<?>}
+  <div class="{$prefix}overlay-window">
+    <div class="{$prefix}list-editor">
+    {foreach $step in $steps}
+      <div data-step="{$step.id}">
+        <span>{$step.id + 1}. {$step.title}</span>
+        {if not isFirst($step)}
+          <i class="material-icons" data-action='up'>arrow_drop_up</i>
+        {else}
+          <span></span>
+        {/if}
+        {if not isLast($step)}
+          <i class="material-icons" data-action='down'>arrow_drop_down</i>
+        {else}
+          <span></span>
+        {/if}
+        <i class="material-icons" data-action='delete'>delete</i>
+      </div>
+    {/foreach}
+    </div>
+    <i class="material-icons {$prefix}edit-button {$prefix}add-step">add_circle</i>
+  </div>
 {/template}

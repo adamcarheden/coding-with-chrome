@@ -225,7 +225,7 @@
 }
 
 
-#{$prefix}tutorial-media-overlay {
+#{$prefix}tutorial-overlay {
   align-items: center;
   background-color: #000;
   bottom: 0;
@@ -237,30 +237,110 @@
   top: 34px; /* height of header */
 }
 
-#{$prefix}tutorial-media-overlay.is-hidden {
+#{$prefix}tutorial-overlay.is-hidden {
   display: none;
 }
 
-#{$prefix}tutorial-media-overlay-content img,
-#{$prefix}tutorial-media-overlay-content video,
-#{$prefix}tutorial-media-overlay-content webview {
+#{$prefix}tutorial-overlay-content img,
+#{$prefix}tutorial-overlay-content video,
+#{$prefix}tutorial-overlay-content webview {
   max-height: 90vh;
   max-width: 90vw;
 }
 
-#{$prefix}tutorial-media-overlay video::-webkit-media-controls-fullscreen-button {
+#{$prefix}tutorial-overlay video::-webkit-media-controls-fullscreen-button {
   display: none;
 }
 
-#{$prefix}tutorial-media-overlay video,
-#{$prefix}tutorial-media-overlay webview {
+#{$prefix}tutorial-overlay video,
+#{$prefix}tutorial-overlay webview {
   height: 750px;
   width: 1000px;
 }
 
-#{$prefix}tutorial-media-overlay-close {
+#{$prefix}tutorial-overlay-close {
   color: #fff;
   left: 16px;
   position: absolute;
   top: 16px;
 }
+
+/* Hide edit controls for read-only tutorials */
+.{$prefix}tutorial-readonly .{$prefix}tutorial-edit,
+.{$prefix}tutorial-step-container:not(.{$prefix}tutorial-step-container--active) .{$prefix}tutorial-edit {
+  display: none;
+}
+/* Hide the enable-edit (locked) button when the tutorial is being edited */
+#{$prefix}tutorial-container:not(.{$prefix}tutorial-readonly) #{$prefix}tutorial-edit-enable {
+  display: none;
+}
+/* Hide indivudual forms that aren't actively being edited */
+.{$prefix}tutorial-edit-field:not(.{$prefix}tutorial-edit-active) .{$prefix}tutorial-edit-form {
+  display: none;
+}
+/* Hide edit buttons for active forms */
+.{$prefix}tutorial-edit-active .{$prefix}tutorial-edit-activate {
+  display: none;
+}
+/* Hide field values while editing */
+#{$prefix}tutorial-container:not(.{$prefix}tutorial-readonly) .{$prefix}tutorial-edit-active .{$prefix}tutorial-value {
+  display: none;
+}
+
+/* Display the master control on the right */
+.{$prefix}tutorial-edit-button {
+  float: right;
+}
+
+/* Make forms fill the available space */
+.{$prefix}tutorial-edit-form {
+  display: flex;
+  flex-direction: row;
+}
+.{$prefix}tutorial-edit-form textarea, 
+.{$prefix}tutorial-edit-form input {
+  flex: auto;
+}
+.{$prefix}tutorial-edit-control {
+  display: flex;
+  flex: none;
+}
+
+/* List editor overlay */
+.{$prefix}tutorial-overlay-window {
+  background-color: white;
+  border: groove 5px;
+  padding: 2.5em;
+}
+.{$prefix}tutorial-list-editor {
+  display: table;
+}
+.{$prefix}tutorial-list-editor > div {
+  display: table-row;
+}
+.{$prefix}tutorial-list-editor > div > span,
+.{$prefix}tutorial-list-editor > div > i {
+  display: table-cell;
+}
+.{$prefix}tutorial-list-editor > div > span {
+  padding: 0.1em;
+}
+
+.{$prefix}tutorial-readonly .{$prefix}tutorial-edit-only .{$prefix}tutorial-value,
+.{$prefix}tutorial-readonly .{$prefix}tutorial-edit-only .{$prefix}tutorial-label {
+  display: none;
+}
+.{$prefix}tutorial-label {
+  font-weight: bold;
+  display: block;
+}
+
+.{$prefix}tutorial-step-validate .{$prefix}tutorial-value {
+  white-space: pre;
+}
+
+.{$prefix}tutorial-step-validateType .{$prefix}tutorial-value,
+.{$prefix}tutorial-step-validateType option {
+  text-transform: capitalize;
+}
+

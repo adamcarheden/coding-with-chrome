@@ -180,7 +180,8 @@ cwc.addon.Workbench.prototype.showRelevantProjects_ = async function() {
                 };
               }),
             };
-            return tutorialInstance.setTutorial(tutorialSpec, this.imagesDb_);
+            return tutorialInstance.setTutorial(tutorialSpec, userLanguage,
+              this.imagesDb_);
           })
           .then(() => {
             tutorialInstance.startTutorial();

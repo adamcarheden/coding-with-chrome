@@ -247,8 +247,10 @@ describe('Tutorial', function() {
   });
 
   it('getValidate', async function() {
+    // TODO(carheden): figure out how to include
+    // cwc.ui.TutorialValidator.Type.FUNCTION in tests (it results to null)
     let validate1 = {
-      'type': cwc.ui.TutorialValidator.Type.FUNCTION,
+      'type': 'function',
       'value': function() {
         return {
           'solved': true,
@@ -257,17 +259,18 @@ describe('Tutorial', function() {
       }.toString(),
     };
     let validate2 = {
-      'type': cwc.ui.TutorialValidator.Type.FUNCTION,
-      'value': function() {
-        return {
-           'solved': true,
-          'message': 'validate_message_2',
-         };
-      }.toString(),
+      'type': 'match_text_output',
+      'value': 'Hello, World!',
     };
-    let tutorialTemplate = getTutorialTemplate(3);
+    let validate3 = {
+      'type': 'match_text_output',
+      'value': randomString(),
+      'message': 'Test success message',
+    };
+    let tutorialTemplate = getTutorialTemplate(4);
     tutorialTemplate['steps'][0]['validate'] = validate1;
     tutorialTemplate['steps'][1]['validate'] = validate2;
+    tutorialTemplate['steps'][2]['validate'] = validate3;
     let builder = await testTutorial(tutorialTemplate);
     let tutorial = builder.getHelper().getInstance('tutorial');
 
@@ -280,6 +283,10 @@ describe('Tutorial', function() {
 
     // Advance to the 3rd step and check that
     clickStepButton('continue', 1);
+    expect(tutorial.getValidate()).toEqual(validate3);
+
+    // Advance to the 4th step and check that
+    clickStepButton('continue', 2);
     expect(tutorial.getValidate()).toBeNull();
   });
 

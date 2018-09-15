@@ -33,6 +33,7 @@ goog.require('cwc.utils.mime.Type');
 goog.require('cwc.utils.Resources');
 
 goog.require('goog.dom');
+goog.require('goog.dom.classes');
 goog.require('goog.html.SafeHtml');
 goog.require('goog.html.sanitizer.HtmlSanitizer');
 goog.require('goog.events');
@@ -42,6 +43,7 @@ goog.require('goog.style');
 goog.require('goog.ui.Component');
 goog.require('soydata.VERY_UNSAFE');
 
+cwc.ui.Tutorial.VideoExtensions = ['mp4', 'webm', 'ogg'];
 
 /**
  * @param {!cwc.utils.Helper} helper
@@ -69,20 +71,23 @@ cwc.ui.Tutorial = function(helper) {
   /** @private {!cwc.utils.Logger} */
   this.log_ = new cwc.utils.Logger(this.name);
 
+  /** @private {string} */
+  this.language_ = this.helper.getUserLanguage();
+
   /** @private {!string} */
   this.activeStepClass_ = this.prefix + 'step-container--active';
 
   /** @private {!string} */
   this.completedStepClass_ = this.prefix + 'step-container--complete';
 
-  /** @private {Element} */
-  this.nodeMediaOverlay_ = null;
+  /** @private {!Element} */
+  this.nodeOverlay_ = null;
 
-  /** @private {Element} */
-  this.nodeMediaOverlayClose_ = null;
+  /** @private {!Element} */
+  this.nodeOverlayClose_ = null;
 
-  /** @private {Element} */
-  this.nodeMediaOverlayContent_ = null;
+  /** @private {!Element} */
+  this.nodeOverlayContent_ = null;
 
   /** @private {!cwc.utils.Database} */
   this.imagesDb_ = null;
@@ -102,8 +107,20 @@ cwc.ui.Tutorial = function(helper) {
   /** @private {!cwc.utils.Events} */
   this.editorEvents_ = new cwc.utils.Events(this.name+'_editor', '', this);
 
+  /** @private {!cwc.utils.Events} */
+  this.listEditorEvents_ = new cwc.utils.Events(this.name+'_list_editor', '',
+    this);
+
   /** @private {boolean} */
   this.webviewSupport_ = this.helper.checkChromeFeature('webview');
+
+  /** @private {boolean} */
+  this.allowEdit_ = false;
+  let userConfigInstance = this.helper.getInstance('userConfig');
+  if (userConfigInstance) {
+    this.allowEdit_ = userConfigInstance.get(cwc.userConfigType.GENERAL,
+        cwc.userConfigName.TEACHER_MODE) === true;
+  }
 
   /** @private {!boolean} */
   this.contentSet_ = false;
@@ -117,23 +134,29 @@ cwc.ui.Tutorial = function(helper) {
   /** @private {Element} */
   this.rootNode_ = null;
 
-  /** @private {cwc.ui.Tour} */
-  this.tour_ = this.helper.getInstance('tour');
+  /** @private {goog.html.sanitizer.HtmlSanitizer} */
+  this.sanitizer_ = new goog.html.sanitizer.HtmlSanitizer();
 };
 
 
 /**
  * @param {!Object} tutorial
+ * @param {string} language
  * @param {cwc.utils.Database} imagesDb
  * @export
  */
-cwc.ui.Tutorial.prototype.setTutorial = async function(tutorial, imagesDb) {
+cwc.ui.Tutorial.prototype.setTutorial = async function(tutorial, language,
+  imagesDb) {
   this.log_.info('Setting tutorial', tutorial);
   this.clear();
   if (!tutorial) {
     this.log_.info('No tutorial');
     return;
   }
+
+	if (language) {
+    this.language_ = language;
+	}
 
   await this.setImagesDb_(imagesDb);
   await this.parseSteps_(tutorial['steps']);
@@ -198,22 +221,21 @@ cwc.ui.Tutorial.prototype.parseSteps_ = async function(steps) {
   }
   this.steps_ = [];
 
-  await Promise.all(steps.map((step, id) => {
-    return this.addStep_(step, id);
-  }));
+  for (let i=0; i<steps.length; i++) {
+    await this.appendStep_(steps[i]);
+  }
 };
 
 
-/**
- * @param {!Object} stepTemplate
- * @param {!int} id
+/*
+ * @param {!object} stepTemplate
  * @private
  */
-cwc.ui.Tutorial.prototype.addStep_ = async function(stepTemplate, id) {
+cwc.ui.Tutorial.prototype.appendStep_ = async function(stepTemplate) {
   let description = this.parseDescription_(stepTemplate['description']);
   if (!description) {
-    this.log_.error('Skipping step', id, 'because parsing it\'s ' +
-      'description failed', stepTemplate['description']);
+    this.log_.error('Skipping step', this.steps_.length,
+      'because parsing it\'s description failed', stepTemplate['description']);
     return;
   }
 
@@ -222,7 +244,7 @@ cwc.ui.Tutorial.prototype.addStep_ = async function(stepTemplate, id) {
     if (typeof stepTemplate['code'] === 'string') {
       code = stepTemplate['code'];
     } else {
-      this.log_.warn('Expecting string for code of step ', id,
+      this.log_.warn('Expecting string for code of step ', this.steps_.length,
         ', got ', stepTemplate['code']);
     }
   }
@@ -232,34 +254,60 @@ cwc.ui.Tutorial.prototype.addStep_ = async function(stepTemplate, id) {
     await this.appendBinaries_(stepTemplate['images'], images, 'image');
   }
 
-  let tour = false;
-  if (stepTemplate['tour']) {
-    if (Array.isArray(stepTemplate['tour'])) {
-      tour = stepTemplate['tour'];
-      tour.forEach((step, stepNumber) => {
-        if (!('buttons' in step)) {
-          step['buttons'] = this.tour_.getStepButtons(stepNumber, tour.length,
-            () => {
-            this.cancelTour_();
-          });
-        }
-      });
-    } else {
-      this.log_.warn('Skipping tour for step', id, 'because it is not an array',
-        stepTemplate['tour']);
-    }
-  }
-
-  this.steps_[id] = {
+  this.steps_.push({
     code: code,
     description: description,
-    id: id,
     images: images,
     title: stepTemplate['title'] || '',
-    validate: stepTemplate['validate'] || false,
+    validate: this.parseValidate_(stepTemplate['validate']),
     videos: stepTemplate['videos'] || [],
-    tour: tour,
+  });
+};
+
+/**
+ * @param {!object} template
+ * @return {object|null}
+ * @private
+ */
+cwc.ui.Tutorial.prototype.parseValidate_ = function(template) {
+  if (!template) {
+    return null;
+  }
+
+  let valid = true;
+  let invalid = (msg) => {
+    this.log_.warn(msg, template);
+    valid = false;
   };
+
+  if ((typeof template) !== 'object') {
+    invalid('Validate template not an object');
+  }
+
+  if ('value' in template) {
+    if ((typeof template['value']) !== 'string') {
+      invalid('Validate value should be a string');
+    }
+  } else {
+    invalid('Validate template has no \'value\' key');
+  }
+
+  if ('type' in template) {
+    if ((typeof template['type']) === 'string') {
+      let validTypes = cwc.ui.TutorialValidator.validatorTypes();
+      if (!validTypes.includes(template['type'])) {
+        invalid('Type must be one of '+(validTypes.join('\', \'')+'\''));
+      }
+    } else {
+      invalid('Validate type should be a string');
+    }
+  } else {
+    invalid('Validate template has no \'type\' key');
+  }
+
+  if (valid) return template;
+
+  return null;
 };
 
 
@@ -316,8 +364,8 @@ cwc.ui.Tutorial.prototype.ensureUrlInDB_ =
  * @return {!Promise}
  * @private
  */
-cwc.ui.Tutorial.prototype.appendBinaries_ =
-  function(source, destination, name) {
+cwc.ui.Tutorial.prototype.appendBinaries_ = function(source, destination,
+  name) {
   return Promise.all(source.map(async function(spec, index) {
     switch (typeof spec) {
       case 'string': {
@@ -404,17 +452,17 @@ cwc.ui.Tutorial.prototype.parseDescription_ = function(description) {
     return '';
   }
 
-  const sanitizer = new goog.html.sanitizer.HtmlSanitizer();
   switch (description['mime_type']) {
     case cwc.utils.mime.Type.HTML.type: {
       return soydata.VERY_UNSAFE.ordainSanitizedHtml(
-        goog.html.SafeHtml.unwrap(sanitizer.sanitize(description['text'])));
+        goog.html.SafeHtml.unwrap(
+          this.sanitizer_.sanitize(description['text'])));
     }
     case cwc.utils.mime.Type.MARKDOWN.type: {
       if (this.helper.checkJavaScriptFeature('marked')) {
         return soydata.VERY_UNSAFE.ordainSanitizedHtml(
-          goog.html.SafeHtml.unwrap(sanitizer.sanitize(marked(
-            description['text']))));
+          goog.html.SafeHtml.unwrap(
+            this.sanitizer_.sanitize(marked(description['text']))));
       } else {
         this.log_.warn('Markdown not supported, displaying description text',
           description);
@@ -443,44 +491,66 @@ cwc.ui.Tutorial.prototype.startTutorial = function() {
     return;
   }
 
-  let sidebarInstance = this.helper.getInstance('sidebar');
-  if (sidebarInstance) {
-    sidebarInstance.showTemplateContent('tutorial', 'Tutorial',
-      cwc.soy.ui.Tutorial.template, {
-        prefix: this.prefix,
-        description: this.description_,
-        online: this.helper.checkFeature('online'),
-        url: this.url_ ? this.url_ : '',
-        steps: this.steps_.map((step, index) => ({
-          id: index,
-          description: step.description,
-          images: step.images.filter((url = '') =>
-            !this.videoExtensions.some((ext) => url.endsWith(ext))
-          ),
-          number: index + 1,
-          title: step.title || `Step ${index + 1}`,
-          videos: step.images.filter((url = '') =>
-            this.videoExtensions.some((ext) => url.endsWith(ext))
-          ),
-          youtube_videos: (step.videos || []).map((video) =>
-            video['youtube_id']
-          ),
-          hasCode: step.code && step.code.trim().length > 0,
-          hasTour: !!step.tour,
-        })),
-      }
-    );
-    this.rootNode_ = goog.dom.getElement(this.prefix + 'container');
-  }
-
   this.state_ = {
     completedSteps: [],
     activeStepID: null,
     inProgressStepID: null,
   };
 
+  this.restartTutorial_();
+};
+
+/**
+ * Renders the tutorial in the sidebar
+ * @export
+ */
+cwc.ui.Tutorial.prototype.restartTutorial_ = function() {
+  this.render_();
   this.initUI_();
   this.startValidate();
+};
+
+
+/**
+ * @private
+ */
+cwc.ui.Tutorial.prototype.render_ = function() {
+  let sidebarInstance = this.helper.getInstance('sidebar');
+  if (!sidebarInstance) {
+    this.log_.error('No sidebar, not rendering tutorial');
+    return;
+  }
+  sidebarInstance.showTemplateContent('tutorial', 'Tutorial',
+    cwc.soy.ui.Tutorial.template, {
+      allowEdit: this.allowEdit_,
+      prefix: this.prefix,
+      description: this.description_,
+      online: this.helper.checkFeature('online'),
+      url: this.url_ ? this.url_ : '',
+      steps: this.steps_.map((step, index) => ({
+        id: index,
+        description: step.description,
+        images: step.images.filter((url = '') =>
+          !this.videoExtensions.some((ext) => url.endsWith(ext))
+        ),
+        number: index + 1,
+        title: step.title || `Step ${index + 1}`,
+        videos: step.images.filter((url = '') =>
+          this.videoExtensions.some((ext) => url.endsWith(ext))
+        ),
+        youtube_videos: (step.videos || []).map((video) =>
+          video['youtube_id']
+        ),
+        hasCode: step.code && step.code.trim().length > 0 ? true : false,
+        validate: step.validate ? step.validate.value : '',
+        selectedValidateType: step.validate ? step.validate.type :
+          cwc.ui.TutorialValidator.Type.MATCH_TEXT_OUTPUT,
+        validateTypes: cwc.ui.TutorialValidator.humanTypes(),
+        code: step.code ? step.code : '',
+      })),
+    }
+  );
+  this.rootNode_ = goog.dom.getElement(this.prefix + 'container');
 };
 
 
@@ -491,29 +561,32 @@ cwc.ui.Tutorial.prototype.startTutorial = function() {
  */
 cwc.ui.Tutorial.prototype.initUI_ = function() {
   this.initSteps_();
+  this.initOverlay_();
   this.initMedia_();
+  this.initEditButtons_();
 
   let state = {};
   if (this.steps_.length > 0) {
-    state.activeStepID = this.state_.activeStepID || this.steps_[0].id;
+    state.activeStepID = this.state_.activeStepID || 0;
   }
   this.setState_(state);
 };
 
 /**
- * Captures references to elements needed by the media overlay.
+ * Captures references to elements needed by the overlay
  * @private
  */
-cwc.ui.Tutorial.prototype.initMediaOverlay_ = function() {
-  this.nodeMediaOverlay_ = goog.dom.getElement(this.prefix + 'media-overlay');
-  this.nodeMediaOverlayClose_ = goog.dom.getElement(
-    this.prefix + 'media-overlay-close');
-  this.nodeMediaOverlayContent_ = goog.dom.getElement(
-    this.prefix + 'media-overlay-content');
+cwc.ui.Tutorial.prototype.initOverlay_ = function() {
+  this.nodeOverlay_ = goog.dom.getElement(this.prefix + 'overlay');
+  this.nodeOverlayClose_ = goog.dom.getElement(
+    this.prefix + 'overlay-close');
+  this.nodeOverlayContent_ = goog.dom.getElement(
+    this.prefix + 'overlay-content');
 
-  this.nodeMediaOverlayClose_.addEventListener('click', () => {
+  this.nodeOverlayClose_.addEventListener('click', () => {
+    // TODO(carheden): Restart tutorial, possibly only if steps have changed
     this.setState_({
-      expandedMedia: null,
+      overlayContent: null,
     });
   });
 };
@@ -524,23 +597,24 @@ cwc.ui.Tutorial.prototype.initMediaOverlay_ = function() {
  * @private
  */
 cwc.ui.Tutorial.prototype.initMedia_ = function() {
-  this.initMediaOverlay_();
-  let nodeListImages = this.rootNode_.querySelectorAll('.' + this.prefix +
-    'step-image');
-  if (this.imagesDb_) {
-    [].forEach.call(nodeListImages, (image) => {
-      let imageSrc = image.getAttribute('data-src');
-      this.imagesDb_.get(imageSrc).then((blob) => {
-        if (blob) {
-          let objectURL = URL.createObjectURL(blob);
-          image.src = objectURL;
-          this.objectURLs_.push(objectURL);
-        } else {
-          image.remove();
-        }
-      });
-    });
+  if (!this.imagesDb_) {
+    this.log_.error('No images database, not loading images');
+    return;
   }
+  let nodeListImages = this.rootNode_.querySelectorAll('.' + this.prefix +
+    'image');
+  [].forEach.call(nodeListImages, (image) => {
+    let imageSrc = image.getAttribute('data-src');
+    this.imagesDb_.get(imageSrc).then((blob) => {
+      if (blob) {
+        let objectURL = URL.createObjectURL(blob);
+        image.src = objectURL;
+        this.objectURLs_.push(objectURL);
+      } else {
+        image.remove();
+      }
+    });
+  });
 };
 
 
@@ -551,8 +625,12 @@ cwc.ui.Tutorial.prototype.initMedia_ = function() {
 cwc.ui.Tutorial.prototype.initSteps_ = function() {
   let prefix = this.prefix + 'step-';
   let classPrefix = '.'+prefix;
-  this.steps_.forEach((step) => {
-    let stepNode = goog.dom.getElement(prefix + step.id);
+  this.steps_.forEach((step, id) => {
+    let stepNode = goog.dom.getElement(prefix + id);
+    if (!stepNode) {
+      this.log_.error('Failed to find node for step', id);
+      return;
+    }
     step.node = stepNode;
     step.nodeContinue = stepNode.querySelector(classPrefix + 'continue');
     step.nodeLoadCode = stepNode.querySelector(classPrefix + 'load-code');
@@ -572,7 +650,7 @@ cwc.ui.Tutorial.prototype.initSteps_ = function() {
  * @private
  */
 cwc.ui.Tutorial.prototype.initStepButtons_ = function() {
-  this.steps_.forEach((step) => {
+  this.steps_.forEach((step, id) => {
     if (step.nodeContinue) {
       goog.events.listen(step.nodeContinue, goog.events.EventType.CLICK,
         this.completeCurrentStep_.bind(this));
@@ -586,13 +664,387 @@ cwc.ui.Tutorial.prototype.initStepButtons_ = function() {
         this.loadTour.bind(this));
     }
     goog.events.listen(step.nodeHeader, goog.events.EventType.CLICK,
-      this.jumpToStep_.bind(this, step.id));
+      this.jumpToStep_.bind(this, id));
 
     [].forEach.call(step.nodeListMediaExpand, (toggle) => {
       goog.events.listen(toggle, goog.events.EventType.CLICK,
         this.onMediaClick_.bind(this, toggle));
     });
   });
+};
+
+/**
+ * Listens for clicks on the edit lock/unlock buttons
+ * @private
+ */
+cwc.ui.Tutorial.prototype.initEditButtons_ = function() {
+  if (!this.allowEdit_) {
+    return;
+  }
+  ['enable', 'disable'].forEach((suffix) => {
+    let button = goog.dom.getElement(this.prefix + 'edit-' + suffix);
+    if (!button) {
+      this.log_.error('Failed to find', suffix, 'edit button');
+      return;
+    }
+    goog.events.listen(button, goog.events.EventType.CLICK,
+      this.toggleEdit_.bind(this));
+  });
+
+  let editStepsButton = goog.dom.getElement(this.prefix + 'edit-steps');
+  if (editStepsButton) {
+    goog.events.listen(editStepsButton, goog.events.EventType.CLICK,
+      this.editSteps_.bind(this));
+  } else {
+    this.log_.error('Failed to find edit-steps button');
+  }
+
+  document.querySelectorAll('.' + this.prefix + 'edit-activate').forEach(
+    (button) => {
+      goog.events.listen(button, goog.events.EventType.CLICK, (event) => {
+        let field = this.findField_(event.target);
+        if (!field) return;
+        this.toggleFieldEdit_(field);
+      });
+  });
+
+  document.querySelectorAll('.' + this.prefix + 'edit-save').forEach(
+    (button) => {
+      goog.events.listen(button, goog.events.EventType.CLICK, (event) => {
+        let field = this.findField_(event.target);
+        if (!field) return;
+        this.toggleFieldEdit_(field);
+        this.saveField_(field);
+      });
+  });
+};
+
+/**
+ * Enables/disables edit functionality for the tutorial
+ * @private
+ */
+cwc.ui.Tutorial.prototype.toggleEdit_ = function() {
+  if (!this.allowEdit_) {
+    this.log_.warn('Edit button clicked even though editing is not allowed.');
+    return;
+  }
+  // TODO(carheden): Make this an instance var -- Possibly done by merge
+  let rootNode = goog.dom.getElement(this.prefix + 'container');
+  if (!rootNode) {
+    return;
+  }
+
+  goog.dom.classes.toggle(rootNode, this.prefix + 'readonly');
+};
+
+/**
+ * Listens to clicks on edit buttons for individual fields
+ * @param {Element} field
+ * @private
+ */
+cwc.ui.Tutorial.prototype.toggleFieldEdit_ = function(field) {
+  goog.dom.classes.toggle(field, this.prefix + 'edit-active');
+};
+
+/**
+ * Finds containing edit field
+ * @param {!Element} childElement
+ * @private
+ * @return {!Element|boolean}
+ */
+cwc.ui.Tutorial.prototype.findField_ = function(childElement) {
+  let fieldSelector = '.' + this.prefix + 'edit-field';
+  let field = childElement.closest(fieldSelector);
+  if (!field) {
+    this.log_.warn('Failed to find ancestor of', childElement, 'with selector',
+      fieldSelector);
+    return false;
+  }
+  return field;
+};
+
+/**
+ * @param {Element} field
+ * @private
+ */
+cwc.ui.Tutorial.prototype.saveField_ = function(field) {
+  let fieldName = field.getAttribute('data-field');
+  if (!fieldName) {
+    this.log_.warn('Can\'t save', field,
+      'because it\'s missing the data-field attribute');
+    return;
+  }
+
+  // Update the tutorial data
+  let valueFormElement = field.querySelector('.' + this.prefix + 'edit-value');
+  if (!valueFormElement) {
+    this.log_.error('Failed to find edit-value element for', field);
+    return;
+  }
+  let step = field.getAttribute('data-step');
+  let setResult;
+  try {
+    if (step) {
+      setResult = this.setStepValue_(step, fieldName, valueFormElement.value);
+    } else {
+      setResult = this.setTutorialValue_(fieldName, valueFormElement.value);
+    }
+  } catch (setError) {
+    this.log_.error('Failed to set', fieldName, 'to', valueFormElement.value,
+      setError.message);
+    return;
+  }
+
+  // Redraw the edited form
+  let valueElement = field.querySelector('.' + this.prefix + 'value');
+  if (!valueElement) {
+    this.log_.error('Failed to find value element for', field);
+    return;
+  }
+  goog.soy.renderElement(valueElement, cwc.soy.ui.Tutorial.value, {
+    value: setResult.setValue,
+  });
+  if (setResult.callback) setResult.callback(step);
+};
+
+/**
+ * @param {!string} field
+ * @param {!string} value
+ * @private
+ * @return {Object}
+ */
+cwc.ui.Tutorial.prototype.setTutorialValue_ = function(field, value) {
+  let setValue;
+  switch (field) {
+    case 'description':
+      setValue = this.description_ = this.parseDescription_({
+        'mime_type': cwc.utils.mime.Type.HTML.type,
+        'text': value,
+      });
+      break;
+    default:
+      throw new Error('Attempt to set unknown field ' + field);
+  }
+  return {setValue: setValue};
+};
+
+/**
+ * @param {number} stepID
+ * @param {!string} field
+ * @param {!string} value
+ * @private
+ * @return {Object}
+ */
+cwc.ui.Tutorial.prototype.setStepValue_ = function(stepID, field, value) {
+  if (stepID < 0 || stepID >= this.steps_.length) {
+    throw new Error('Step number' + stepID + 'out side of range');
+  }
+  let step = this.steps_[stepID];
+  let ensureValidate = () => {
+    if (step.validate) return;
+    step.validate = {
+      'type': cwc.ui.TutorialValidator.Type.MATCH_TEXT_OUTPUT,
+      'message': '',
+      'value': '',
+    };
+  };
+  let setValue;
+  let callback = false;
+  switch (field) {
+    case 'title': {
+      setValue = step.title = value;
+      break;
+    }
+    case 'description': {
+      // TODO(carheden): support multiple mime types
+      setValue = step.description = this.parseDescription_({
+        'mime_type': cwc.utils.mime.Type.HTML.type,
+        'text': value,
+      });
+      break;
+    }
+    case 'validate': {
+      ensureValidate();
+      step.validate.value = value;
+      step.validate = this.parseValidate_(step.validate);
+      setValue = step.validate ? step.validate.value : '';
+      this.restartValidate_();
+      break;
+    }
+    case 'validateType': {
+      ensureValidate();
+      step.validate.type = value;
+      step.validate = this.parseValidate_(step.validate);
+      setValue = step.validate ?
+        cwc.ui.TutorialValidator.humanTypes()[step.validate.type] : '';
+      this.restartValidate_();
+      break;
+    }
+    case 'code': {
+      setValue = step.code = value;
+      callback = this.updateActions_.bind(this);
+      break;
+    }
+    default: {
+      throw new Error('Attempt to set unknown field ' + field +' on step ' +
+        step);
+    }
+  }
+  return {
+    setValue: setValue,
+    callback: callback,
+  };
+};
+
+/**
+ * @param {number} stepNumber
+ * @private
+ */
+cwc.ui.Tutorial.prototype.updateActions_ = function(stepNumber) {
+  // TODO(carheden): Redraw step actions
+  this.log_.info('Redrawing actions for', stepNumber);
+};
+
+/**
+ * Opens the step editor dialog
+ * @private
+ */
+cwc.ui.Tutorial.prototype.editSteps_ = function() {
+  this.hideOverlay_();
+
+  let steps = this.steps_.map((step, index) => {
+    return {
+      id: index,
+      title: step.title,
+    };
+  });
+
+  let stepEditor = document.createElement('div');
+  goog.soy.renderElement(stepEditor, cwc.soy.ui.Tutorial.stepEditor_, {
+    prefix: this.prefix,
+    steps: steps,
+  });
+
+  this.setState_({
+    overlayContent: stepEditor,
+  });
+
+  this.initStepEditorButtons_(stepEditor);
+};
+
+/**
+ * Starts listening on the step editor buttons
+ * @param {Element} stepEditor
+ * @private
+ */
+cwc.ui.Tutorial.prototype.initStepEditorButtons_ = function(stepEditor) {
+  this.listEditorEvents_.clear();
+
+  let buttons = stepEditor.querySelectorAll('.' + this.prefix +
+    'list-editor i.material-icons');
+  buttons.forEach((button) => {
+    let action = button.getAttribute('data-action');
+    let callback;
+    switch (button.getAttribute('data-action')) {
+      case 'up':
+        callback = this.moveStepUp_.bind(this);
+        break;
+      case 'down':
+        callback = this.moveStepDown_.bind(this);
+        break;
+      case 'delete':
+        callback = this.deleteStep_.bind(this);
+        break;
+      default:
+        this.log_.error('Unknown action', action, 'for button', button);
+        return;
+    }
+    this.listEditorEvents_.listen(button, goog.events.EventType.CLICK,
+      async (event) => {
+        await callback(event.target.parentElement.getAttribute('data-step'));
+        this.restartTutorial_();
+        this.toggleEdit_();
+        this.editSteps_();
+      }
+    );
+  });
+
+  let addStepButton = stepEditor.querySelector('.' + this.prefix + 'add-step');
+  if (!addStepButton) {
+    this.log_.error('Failed to find add-step button');
+    return;
+  }
+  this.listEditorEvents_.listen(addStepButton, goog.events.EventType.CLICK,
+    async () => {
+      await this.addStep_();
+      this.restartTutorial_();
+      this.toggleEdit_();
+      this.editSteps_();
+    });
+};
+
+
+/**
+ * Moves a step up in the list
+ * @param {!Number} stepNumber
+ * @private
+ */
+cwc.ui.Tutorial.prototype.moveStepUp_ = async function(stepNumber) {
+  if (stepNumber < 1 || stepNumber >= this.steps_.length) {
+    this.log_.error('Attempt to move step', stepNumber, 'up');
+    return;
+  }
+  this.steps_.splice(stepNumber - 1, 0, this.steps_.splice(stepNumber, 1)[0]);
+};
+/**
+ * Moves a step down in the list
+ * @param {!Number} stepNumber
+ * @private
+ */
+cwc.ui.Tutorial.prototype.moveStepDown_ = async function(stepNumber) {
+  if (stepNumber < 0 || stepNumber >= this.steps_.length - 1) {
+    this.log_.error('Attempt to move step', stepNumber, 'down');
+    return;
+  }
+  this.steps_.splice(stepNumber + 1, 0, this.steps_.splice(stepNumber, 1)[0]);
+};
+/**
+ * Removes a step from the list after confirming with the user
+ * @param {!Number} stepNumber
+ * @private
+ */
+cwc.ui.Tutorial.prototype.deleteStep_ = async function(stepNumber) {
+  let dialogInstance = this.helper.getInstance('dialog');
+  let title = {
+    icon: 'warning',
+    title: 'Delete step',
+    untranslated: ' ' + (1 + stepNumber),
+  };
+  let content = 'Are you sure you want to delete step '+(stepNumber + 1);
+  let action = i18t('Delete it');
+  if (await dialogInstance.showActionCancel(title, content, action)) {
+    this.deleteStepConfirmed(stepNumber);
+  }
+};
+/**
+ * Removes a step from the list
+ * @param {!Number} stepNumber
+ */
+cwc.ui.Tutorial.prototype.deleteStepConfirmed = function(stepNumber) {
+  this.steps_.splice(stepNumber, 1);
+};
+/**
+ * Add a step
+ * @private
+ */
+cwc.ui.Tutorial.prototype.addStep_ = async function() {
+  await this.appendStep_({
+    'title': 'New Step',
+    'description': {
+      'mime_type': cwc.utils.mime.Type.HTML.type,
+      'text': '',
+    },
+  }, this.steps_.length);
 };
 
 
@@ -602,16 +1054,15 @@ cwc.ui.Tutorial.prototype.initStepButtons_ = function() {
  */
 cwc.ui.Tutorial.prototype.completeCurrentStep_ = function() {
   let completedSteps = this.state_.completedSteps.slice();
-  let currentStepIndex = this.steps_.findIndex((step) =>
-    step.id === this.state_.activeStepID);
-  let nextStep = this.steps_[currentStepIndex + 1] || {};
   if (!completedSteps.includes(this.state_.activeStepID)) {
     completedSteps.push(this.state_.activeStepID);
   }
+  let nextStepID = Math.max(0, Math.min(this.state_.activeStepID + 1,
+    this.steps_.length - 1));
   this.setState_({
     completedSteps: completedSteps,
-    activeStepID: nextStep.id,
-    inProgressStepID: nextStep.id,
+    activeStepID: nextStepID,
+    inProgressStepID: nextStepID,
   });
   this.scrollToStep_();
 };
@@ -667,13 +1118,19 @@ cwc.ui.Tutorial.prototype.scrollToStep_ = function(stepID) {
 
 
 /**
- * @private
  * @return {!Object}
+ * @private
  */
 cwc.ui.Tutorial.prototype.getActiveStep_ = function() {
   return this.steps_[this.state_.activeStepID];
 };
 
+/**
+ * @return {!number}
+ */
+cwc.ui.Tutorial.prototype.stepCount = function() {
+  return this.steps_.length;
+};
 
 /**
  * @private
@@ -716,7 +1173,7 @@ cwc.ui.Tutorial.prototype.onMediaClick_ = function(button) {
     let clone = mediaImg.cloneNode(true);
     clone.removeAttribute('class');
     this.setState_({
-      expandedMedia: clone,
+      overlayContent: clone,
     });
   } else if (mediaType === 'youtube' && youtubeId) {
     let content = document.createElement(
@@ -724,7 +1181,7 @@ cwc.ui.Tutorial.prototype.onMediaClick_ = function(button) {
     content.src = `https://www.youtube-nocookie.com/embed/${youtubeId}/?rel=0&amp;autoplay=0&showinfo=0`;
 
     this.setState_({
-      expandedMedia: content,
+      overlayContent: content,
     });
   } else if (mediaType === 'video') {
     let video = document.createElement('video');
@@ -735,7 +1192,7 @@ cwc.ui.Tutorial.prototype.onMediaClick_ = function(button) {
         this.objectURLs_.push(objectURL);
         video.controls = true;
         this.setState_({
-          expandedMedia: video,
+          overlayContent: video,
         });
       } else {
         video.remove();
@@ -746,36 +1203,36 @@ cwc.ui.Tutorial.prototype.onMediaClick_ = function(button) {
 
 
 /**
- * Event fired on media overlay close button click.
+ * Event fired on overlay close button click
  * @private
  */
 cwc.ui.Tutorial.prototype.onMediaClose_ = function() {
   this.setState_({
-    expandedMedia: null,
+    overlayContent: null,
   });
 };
 
 
 /**
- * Closes media overlay.
+ * Closes overlay
  * @private
  */
-cwc.ui.Tutorial.prototype.hideMedia_ = function() {
-  while (this.nodeMediaOverlayContent_.firstChild) {
-    this.nodeMediaOverlayContent_.firstChild.remove();
+cwc.ui.Tutorial.prototype.hideOverlay_ = function() {
+  while (this.nodeOverlayContent_.firstChild) {
+    this.nodeOverlayContent_.firstChild.remove();
   }
-  this.nodeMediaOverlay_.classList.add('is-hidden');
+  this.nodeOverlay_.classList.add('is-hidden');
 };
 
 
 /**
- * Shows media overlay with the provided element.
- * @param {!Element} media
+ * Shows overlay with the provided element
+ * @param {!Element} content
  * @private
  */
-cwc.ui.Tutorial.prototype.showMedia_ = function(media) {
-  this.nodeMediaOverlayContent_.appendChild(media);
-  this.nodeMediaOverlay_.classList.remove('is-hidden');
+cwc.ui.Tutorial.prototype.showOverlay_ = function(content) {
+  this.nodeOverlayContent_.appendChild(content);
+  this.nodeOverlay_.classList.remove('is-hidden');
 };
 
 
@@ -786,7 +1243,7 @@ cwc.ui.Tutorial.prototype.showMedia_ = function(media) {
  */
 cwc.ui.Tutorial.prototype.setState_ = function(change) {
   let previousActiveStepID = this.state_.activeStepID;
-  let isEditorDirty = this.isEditorDirty_();
+  let wasEditorDirty = this.isEditorDirty_();
   Object.keys(change).forEach((key) => {
     this.state_[key] = change[key];
   });
@@ -794,7 +1251,7 @@ cwc.ui.Tutorial.prototype.setState_ = function(change) {
     this.cancelTour_();
   }
   this.updateView_();
-  if (!isEditorDirty) {
+  if (!wasEditorDirty) {
     this.loadCode_();
   }
 };
@@ -895,26 +1352,26 @@ cwc.ui.Tutorial.prototype.loadTour = function() {
  * @private
  */
 cwc.ui.Tutorial.prototype.updateView_ = function() {
-  this.steps_.forEach((step) => {
+  this.steps_.forEach((step, id) => {
     // active step
-    if (step.id === this.state_.activeStepID) {
+    if (id === this.state_.activeStepID) {
       step.node.classList.add(this.activeStepClass_);
     } else {
       step.node.classList.remove(this.activeStepClass_);
     }
 
     // completed steps
-    if (this.state_.completedSteps.includes(step.id)) {
+    if (this.state_.completedSteps.includes(id)) {
       step.node.classList.add(this.completedStepClass_);
     } else {
       step.node.classList.remove(this.completedStepClass_);
     }
   });
 
-  if (this.state_.expandedMedia) {
-    this.showMedia_(this.state_.expandedMedia);
+  if (this.state_.overlayContent) {
+    this.showOverlay_(this.state_.overlayContent);
   } else {
-    this.hideMedia_();
+    this.hideOverlay_();
   }
 };
 
@@ -1007,9 +1464,9 @@ cwc.ui.Tutorial.prototype.clear = function() {
   this.url_ = '';
   this.contentSet_ = false;
   this.imagesDb_ = false;
-  this.nodeMediaOverlay_ = null;
-  this.nodeMediaOverlayClose_ = null;
-  this.nodeMediaOverlayContent_ = null;
+  this.nodeOverlay_ = null;
+  this.nodeOverlayClose_ = null;
+  this.nodeOverlayContent_ = null;
   this.editorEvents_.clear();
   while (this.objectURLs_.length > 0) {
     URL.revokeObjectURL(this.objectURLs_.pop());
@@ -1022,4 +1479,94 @@ cwc.ui.Tutorial.prototype.clear = function() {
     this.validator_.stop();
     this.validator_ = null;
   }
+};
+
+/**
+ * Exports tutorial to file metadata
+ */
+cwc.ui.Tutorial.prototype.prepareForSave = async function() {
+  if (!this.allowEdit_) return;
+  if (!this.contentSet_) return;
+  this.log_.info('Saving tutorial');
+
+  let fileInstance = this.helper.getInstance('file');
+  if (!fileInstance) {
+    this.log_.warn('No file instance, tutorial won\'t be saved');
+    return;
+  }
+  let file = fileInstance.getFile();
+  let json = await this.getJSON_();
+  if (file && json) {
+    file.setMetadata('', json, '__tutorial__');
+  }
+};
+
+/**
+ * @return {!string}
+ * @private
+ */
+cwc.ui.Tutorial.prototype.getJSON_ = async function() {
+  let json = {};
+  json[this.language_] = {
+    'description': {
+      'text': this.description_.content,
+      'mime_type': cwc.utils.mime.Type.HTML.type,
+    },
+    'steps': await Promise.all(this.steps_.map(async (step) => {
+      return await this.getStepJSON_(step);
+    })),
+  };
+  return json;
+};
+
+/**
+ * @param {!object} step
+ * @return {!object}
+ * @private
+ */
+cwc.ui.Tutorial.prototype.getStepJSON_ = async function(step) {
+  return {
+    'title': step.title,
+    'description': {
+      'text': step.description.content,
+      'mime_type': cwc.utils.mime.Type.HTML.type,
+    },
+    'images': await Promise.all(step.images.map(async (imageUrl) => {
+      let image = await this.serializeImage_(imageUrl);
+      // The step image can be either a URL or a key to the images database.
+      // If it's not a key in the database, we assume it's a URL.
+      if (image) {
+        return image;
+      }
+      return imageUrl;
+    })),
+    'videos': step.videos,
+  };
+};
+
+/**
+ * @param {!string} key
+ * @return {object<string, string>}
+ * @private
+ */
+cwc.ui.Tutorial.prototype.serializeImage_ = async function(key) {
+  let blob = await this.imagesDb_.get(key);
+  if (!blob) {
+    return;
+  }
+  let data = await new Promise((resolve) => {
+   let reader = new FileReader();
+    reader.addEventListener('loadend', (event) => {
+      let binStr = '';
+      (new Uint8Array(event.target.result)).forEach((i) => {
+        binStr += String.fromCharCode(i);
+      });
+      resolve(btoa(binStr));
+    });
+    reader.readAsArrayBuffer(blob);
+  });
+  return {
+    'mime_type': blob.type,
+    'data': data,
+  };
 };

@@ -39,6 +39,29 @@ cwc.ui.TutorialValidator.Type = {
 
 
 /**
+ * List of validator type values
+ * @return {Array<string>}
+ */
+cwc.ui.TutorialValidator.validatorTypes = function() {
+  return Object.entries(cwc.ui.TutorialValidator.Type).map((pair) => {
+    return pair[1];
+  });
+};
+
+/**
+ * List of validator type values
+ * @return {Object<string, string>}
+ */
+cwc.ui.TutorialValidator.humanTypes = function() {
+  let types = {};
+  Object.entries(cwc.ui.TutorialValidator.Type).forEach((pair) => {
+    types[pair[1]] = i18t(pair[1].replace(/_/g, ' '));
+  });
+  return types;
+};
+
+
+/**
  * @param {!cwc.utils.Helper} helper
  * @constructor
  * @struct
@@ -261,7 +284,7 @@ cwc.ui.TutorialValidator.prototype.handleValidatorLoaded_ = function() {
   }
 
   let validate = this.getValidate_();
-  if (!validate) {
+  if (!(validate && validate['value'].trim())) {
     return;
   }
 
@@ -272,7 +295,7 @@ cwc.ui.TutorialValidator.prototype.handleValidatorLoaded_ = function() {
     case cwc.ui.TutorialValidator.Type.MATCH_TEXT_OUTPUT:
       this.validateByMatchTextOutput_(validate['value'],
         'message' in validate && typeof validate['message'] == 'string' ?
-          validate['message'] : 'Great Job!');
+          validate['message'] : i18t('Great Job!'));
       break;
     default:
       this.log_.warn('Unknown validator type ', validate['type']);
