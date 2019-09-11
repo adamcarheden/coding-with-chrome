@@ -90,6 +90,14 @@
           {/call}
         {/if}
 
+        {if $experimental}
+          {call cwc.soy.SelectScreenTemplate.subTabBarLink data="all"}
+            {param id: 'beginner-kidbright' /}
+            {param module: 'kidbright' /}
+            {param name: 'KidBright' /}
+          {/call}
+        {/if}
+
       </div>
 
       <div class="cwc-select-screen-scroller">
@@ -151,6 +159,15 @@
             {param id: 'beginner-sphero_bb8' /}
             {param content kind="html"}
               {call cwc.soy.SelectScreenNormal.robot.sphero.bb8.overview data="all" /}
+            {/param}
+          {/call}
+        {/if}
+
+        {if $experimental}
+          {call cwc.soy.SelectScreenTemplate.subTabBarContent}
+            {param id: 'beginner-kidbright' /}
+            {param content kind="html"}
+              {call cwc.soy.SelectScreenNormal.robot.kidbright.overview data="all" /}
             {/param}
           {/call}
         {/if}

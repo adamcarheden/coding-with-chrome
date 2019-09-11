@@ -23,6 +23,7 @@ goog.require('cwc.mode.Mod');
 goog.require('cwc.mode.Service');
 goog.require('cwc.mode.Type');
 goog.require('cwc.mode.aiy.Mod');
+goog.require('cwc.mode.kidbright.Mod');
 // goog.require('cwc.mode.raspberryPi.advanced.Mod');
 goog.require('cwc.utils.mime.Type');
 
@@ -42,6 +43,17 @@ cwc.mode.boards.Config[cwc.mode.Type.AIY] = new cwc.mode.Mod({
   mod: cwc.mode.aiy.Mod,
   name: 'AIY',
   template: 'aiy/blank.cwc',
+});
+
+/**
+ * KidBright mode.
+ */
+cwc.mode.boards.Config[cwc.mode.Type.KIDBRIGHT_BLOCKLY] = new cwc.mode.Mod({
+  authors: ['Adam Carheden'],
+  mime_types: [cwc.utils.mime.Type.CWC.type],
+  mod: cwc.mode.kidbright.Mod,
+  name: 'KidBright Blockly',
+  template: 'kidbright/blank.cwc',
 });
 
 

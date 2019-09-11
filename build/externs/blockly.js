@@ -175,6 +175,20 @@ Blockly.JavaScript.ORDER_ATOMIC = '';
  */
 Blockly.JavaScript.prototype.valueToCode = function(block, name, order) {};
 
+/** @type {Object} */
+Blockly.Python = {};
+
+/** @type {string} */
+Blockly.Python.ORDER_ATOMIC = '';
+
+/**
+ * @param {!Blockly.Block} block
+ * @param {string} name
+ * @param {number} order
+ * @return {string}
+ */
+Blockly.Python.prototype.valueToCode = function(block, name, order) {};
+
 
 
 /** @type {Object} */

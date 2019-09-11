@@ -51,9 +51,11 @@ goog.require('goog.ui.Component.EventType');
  * @struct
  * @final
  */
-cwc.ui.Editor = function(helper) {
+cwc.ui.Editor = function(helper,  language = 'javascript') {
   /** @type {string} */
   this.name = 'Editor';
+
+  this.language = language;
 
   /** @type {!cwc.utils.Helper} */
   this.helper = helper;
@@ -117,7 +119,7 @@ cwc.ui.Editor = function(helper) {
 
   /** @private {goog.async.Throttle} */
   this.syncThrottle_ = new goog.async.Throttle(
-    this.syncJavaScript.bind(this), this.syncThrottleTime_);
+    this.syncCode.bind(this), this.syncThrottleTime_);
 
   /** @private {!cwc.utils.Logger|null} */
   this.log_ = new cwc.utils.Logger(this.name);
@@ -348,14 +350,24 @@ cwc.ui.Editor.prototype.setEditorContent = function(content,
 /**
  * Sync JavaScript content from other modules.
  */
-cwc.ui.Editor.prototype.syncJavaScript = function() {
+cwc.ui.Editor.prototype.syncCode = function() {
   let fileUi = this.helper.getInstance('file').getUi();
   let blocklyInstance = this.helper.getInstance('blockly');
   switch (fileUi) {
     case 'blockly':
       if (blocklyInstance) {
-        this.setEditorContent(
-          blocklyInstance.getJavaScript(), cwc.ui.EditorContent.JAVASCRIPT);
+        switch (this.language) {
+          case 'javascript':
+            this.setEditorContent(
+              blocklyInstance.getJavaScript(), cwc.ui.EditorContent.JAVASCRIPT);
+            break;
+          case 'python':
+            this.setEditorContent(
+              blocklyInstance.getPython(), cwc.ui.EditorContent.PYTHON);
+            break;
+          default:
+            this.log_.error('Unknown language: ', this.language);
+        }
       }
       break;
     default:

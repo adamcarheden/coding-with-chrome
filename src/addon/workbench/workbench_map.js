@@ -131,4 +131,10 @@ cwc.addon.WorkbenchMap = {
     mode: cwc.mode.Type.MBOT_RANGER_BLOCKLY,
     wbTagId: 935,
   },
+  // TODO: Have WorkBench add a section to their site for KidBright
+  'CWC Beginner - KidBright ': {
+    appendNode: '#select-screen-tab-beginner-kidbright .mdl-grid',
+    mode: cwc.mode.Type.KIDBRIGHT_BLOCKLY,
+    wbTagId: 935,
+  },
 };

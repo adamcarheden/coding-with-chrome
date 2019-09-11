@@ -35,6 +35,7 @@ cwc.mode.Type = {
   HTML5: 'html5',
   JAVASCRIPT: 'javascript',
   JSON: 'json',
+  KIDBRIGHT_BLOCKLY: 'kidbright_blockly',
   LEGO_WEDO2: 'lego_wedo2',
   LEGO_WEDO2_BLOCKLY: 'lego_wedo2_blockly',
   MBOT_BLOCKLY: 'mbot_blockly',

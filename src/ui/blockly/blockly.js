@@ -352,6 +352,20 @@ cwc.ui.Blockly.prototype.getJavaScript = function() {
   return '';
 };
 
+/**
+ * @return {string}
+ */
+cwc.ui.Blockly.prototype.getPython = function() {
+  let workspace = this.getWorkspace();
+  if (workspace) {
+    try {
+      return Blockly.Python.workspaceToCode(workspace);
+    } catch (e) {
+      this.helper.showError('Error getting Blockly workspace code!');
+    }
+  }
+  return '';
+};
 
 /**
  * @return {string}
